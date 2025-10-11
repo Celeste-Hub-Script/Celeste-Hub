@@ -1,4 +1,5 @@
-local Games = loadstring(game:HttpGet("https://github.com/Celeste-Hub-Script/Celeste-Hub/blob/main/Games"))()
+local Games = 
+loadstring(game:HttpGet("https://github.com/Celeste-Hub-Script/Celeste-Hub/blob/main/Games"))()
 
 local URL = Games[game.PlaceId]
 
