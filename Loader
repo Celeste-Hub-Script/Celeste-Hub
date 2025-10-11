@@ -1,5 +1,7 @@
-local PlaceID = 135880624242201
+local Games = 
 
-If PlaceID = true then
-loadstring(game:HttpGet(‘https://raw.githubusercontent.com/Celeste-Hub-Script/Celeste-Hub/refs/heads/main/Cut%20Trees%20V0.1.0.lua’))()
+local URL = Games[game.PlaceId]
+
+If URL then
+	loadstring(game:HttpGet(URL))()
 end
