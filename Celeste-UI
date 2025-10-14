@@ -3855,9 +3855,9 @@ end)()
 			Config = Config or {}  -- ensure Config is at least an empty table
 
 			local Dropdown = {
-				Values = Config.Values or {},      -- default to empty table
-				Value = Config.Default or nil,     -- default to nil
-				Multi = Config.Multi or false,     -- default to false
+				Values = Config.Values,      -- default to empty table
+				Value = Config.Default,     -- default to nil
+				Multi = Config.Multi,     -- default to false
 				Buttons = {},
 				Opened = false,
 				Type = "Dropdown",
