@@ -3845,57 +3845,59 @@ ElementsTable.Toggle = (function()
 
 	return Element
 end)()
-ElementsTable.Dropdown = (function()
-	local Element = {}
-	Element.__index = Element
-	Element.__type = "Dropdown"
-	local New = Creator.New
+		ElementsTable.Dropdown = (function()
+			local Element = {}
+			Element.__index = Element
+			Element.__type = "Dropdown"
+			local New = Creator.New
 
-	function Element:New(Idx, Config)
+			function Element:New(Idx, Config)
+			Config = Config or {}  -- ensure Config is at least an empty table
 
-		local Dropdown = {
-		Values = Config.Values,
-		Value = Config.Default,
-		Multi = Config.Multi,
-		Buttons = {},
-		Opened = false,
-		Type = "Dropdown",
-		Callback = Config.Callback or function() end,
+			local Dropdown = {
+				Values = Config.Values or {},      -- default to empty table
+				Value = Config.Default or nil,     -- default to nil
+				Multi = Config.Multi or false,     -- default to false
+				Buttons = {},
+				Opened = false,
+				Type = "Dropdown",
+				Callback = Config.Callback or function() end,
 
-		-- Search removed, dropdown no longer supports search filtering
-		Search = false,
-		KeepSearch = false,
-		}
+				-- Search removed, dropdown no longer supports search filtering
+				Search = false,
+				KeepSearch = false,
+			}
 
-		if Dropdown.Multi and Config.AllowNull then
-			Dropdown.Value = {}
+			if Dropdown.Multi and Config.AllowNull then
+				Dropdown.Value = {}
+			end
+
+			local DropdownFrame = Components.Element(Config.Title or "", Config.Description or "", self.Container, false, Config)
+			DropdownFrame.DescLabel.Size = UDim2.new(1, -170, 0, 14)
+
+			Dropdown.SetTitle = DropdownFrame.SetTitle
+			Dropdown.SetDesc = DropdownFrame.SetDesc
+			Dropdown.Visible = DropdownFrame.Visible
+			Dropdown.Elements = DropdownFrame
+
+			local DropdownDisplay = New("TextLabel", {
+				FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+				Text = "",
+				TextColor3 = Color3.fromRGB(240, 240, 240),
+				TextSize = 14,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Size = UDim2.new(1, -40, 0.5, 0),
+				Position = UDim2.new(0, 8, 0.5, 0),
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundTransparency = 1,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				ThemeTag = {
+					TextColor3 = "Text",
+				},
+			})
 		end
-
-		local DropdownFrame = Components.Element(Config.Title, Config.Description, self.Container, false, Config)
-		DropdownFrame.DescLabel.Size = UDim2.new(1, -170, 0, 14)
-
-		Dropdown.SetTitle = DropdownFrame.SetTitle
-		Dropdown.SetDesc = DropdownFrame.SetDesc
-		Dropdown.Visible = DropdownFrame.Visible
-		Dropdown.Elements = DropdownFrame
-
-		local DropdownDisplay = New("TextLabel", {
-			FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
-			Text = "",
-			TextColor3 = Color3.fromRGB(240, 240, 240),
-			TextSize = 14,
-			AutomaticSize = Enum.AutomaticSize.Y,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Size = UDim2.new(1, -40, 0.5, 0),
-			Position = UDim2.new(0, 8, 0.5, 0),
-			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundTransparency = 1,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			ThemeTag = {
-				TextColor3 = "Text",
-			},
-		})
 
 		local DropdownIco = New("ImageLabel", {
 			Image = "rbxassetid://10709790948",
