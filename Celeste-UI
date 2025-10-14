@@ -3257,7 +3257,7 @@ Components.Window = (function()
 		end
 
 
-		Window.ShowSearch = false
+		Window.ShowSearch = (Config.Search == nil) and true or (Config.Search and true or false)
 
 		local SearchFrame = New("Frame", {
 			Size = UDim2.new(1, 0, 0, 35),
