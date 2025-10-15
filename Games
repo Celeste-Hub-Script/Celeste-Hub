@@ -1,6 +1,7 @@
 local Games = {
 	[135880624242201] = "https://raw.githubusercontent.com/Celeste-Hub-Script/Celeste-Hub/refs/heads/main/Cut%20Trees.lua", -- Cut Trees
-  [127742093697776] = "https://raw.githubusercontent.com/Celeste-Hub-Script/Celeste-Hub/refs/heads/main/Plants%20vs.%20Brainrots.lua" -- Plants vs Brainrots
+	[127742093697776] = "https://raw.githubusercontent.com/Celeste-Hub-Script/Celeste-Hub/refs/heads/main/Plants%20vs.%20Brainrots.lua" -- Plants vs Brainrots
+	[121864768012064] = "https://raw.githubusercontent.com/Celeste-Hub-Script/Celeste-Hub/refs/heads/main/Fish%20It.lua" -- Fish It!
 }
 
 return Games
