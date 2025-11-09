@@ -1,0 +1,668 @@
+--________________________________________________________--
+			----------------------------------
+				-- / Main Information \ --
+			----------------------------------
+
+local WindUI
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+    
+    if ok then
+        WindUI = result
+    else 
+        WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+    end
+end
+
+-- */  Window  /* --
+local Window = WindUI:CreateWindow({
+    Title = "Celeste Hub  |  Cut Trees",
+    Author = "by Krafty Cheese",
+    Folder = "Celeste",
+    NewElements = true,
+
+	Size = UDim2.fromOffset(580, 460),
+    Resizable = true,
+    Transparent = true,
+    BackgroundTransparency = 1,
+    Background = "rbxassetid://111397815910859",
+
+    HideSearchBar = true,
+    
+    OpenButton = {
+        Title = "Open",
+        CornerRadius = UDim.new(1,0),
+        StrokeThickness = 3, -- removing outline
+        Enabled = true, -- enable or disable openbutton
+        Draggable = true,
+        OnlyMobile = false,
+        
+        Color = ColorSequence.new( -- gradient
+            Color3.fromHex("#3c2472"), 
+            Color3.fromHex("#9d4fa0")
+        )
+    }
+})
+
+Window:Tag({
+    Title = "V1.0.0",
+    Color = WindUI:Gradient({
+        ["0"]   = { Color = Color3.fromHex("#FFFF00"), Transparency = 0 },
+        ["100"] = { Color = Color3.fromHex("#FFFF85"), Transparency = 0 },
+    }, {
+        Rotation = 45,
+    }),
+})
+
+WindUI:SetFont("rbxassetid://12187370000") 
+
+-- */ Other Functions /* --
+local function parseJSON(luau_table, indent, level, visited)
+    indent = indent or 2
+    level = level or 0
+    visited = visited or {}
+    
+    local currentIndent = string.rep(" ", level * indent)
+    local nextIndent = string.rep(" ", (level + 1) * indent)
+    
+    if luau_table == nil then
+        return "null"
+    end
+    
+    local dataType = type(luau_table)
+    
+    if dataType == "table" then
+        if visited[luau_table] then
+            return "\"[Circular Reference]\""
+        end
+        
+        visited[luau_table] = true
+        
+        local isArray = true
+        local maxIndex = 0
+        
+        for k, _ in pairs(luau_table) do
+            if type(k) == "number" and k > maxIndex then
+                maxIndex = k
+            end
+            if type(k) ~= "number" or k <= 0 or math.floor(k) ~= k then
+                isArray = false
+                break
+            end
+        end
+        
+        local count = 0
+        for _ in pairs(luau_table) do
+            count = count + 1
+        end
+        if count ~= maxIndex and isArray then
+            isArray = false
+        end
+        
+        if count == 0 then
+            return "{}"
+        end
+        
+        if isArray then
+            if count == 0 then
+                return "[]"
+            end
+            
+            local result = "[\n"
+            
+            for i = 1, maxIndex do
+                result = result .. nextIndent .. parseJSON(luau_table[i], indent, level + 1, visited)
+                if i < maxIndex then
+                    result = result .. ","
+                end
+                result = result .. "\n"
+            end
+            
+            result = result .. currentIndent .. "]"
+            return result
+        else
+            local result = "{\n"
+            local first = true
+            
+            local keys = {}
+            for k in pairs(luau_table) do
+                table.insert(keys, k)
+            end
+            table.sort(keys, function(a, b)
+                if type(a) == type(b) then
+                    return tostring(a) < tostring(b)
+                else
+                    return type(a) < type(b)
+                end
+            end)
+            
+            for _, k in ipairs(keys) do
+                local v = luau_table[k]
+                if not first then
+                    result = result .. ",\n"
+                else
+                    first = false
+                end
+                
+                if type(k) == "string" then
+                    result = result .. nextIndent .. "\"" .. k .. "\": "
+                else
+                    result = result .. nextIndent .. "\"" .. tostring(k) .. "\": "
+                end
+                
+                result = result .. parseJSON(v, indent, level + 1, visited)
+            end
+            
+            result = result .. "\n" .. currentIndent .. "}"
+            return result
+        end
+    elseif dataType == "string" then
+        local escaped = luau_table:gsub("\\", "\\\\")
+        escaped = escaped:gsub("\"", "\\\"")
+        escaped = escaped:gsub("\n", "\\n")
+        escaped = escaped:gsub("\r", "\\r")
+        escaped = escaped:gsub("\t", "\\t")
+        
+        return "\"" .. escaped .. "\""
+    elseif dataType == "number" then
+        return tostring(luau_table)
+    elseif dataType == "boolean" then
+        return luau_table and "true" or "false"
+    elseif dataType == "function" then
+        return "\"function\""
+    else
+        return "\"" .. dataType .. "\""
+    end
+end
+
+local function tableToClipboard(luau_table, indent)
+    indent = indent or 4
+    local jsonString = parseJSON(luau_table, indent)
+    setclipboard(jsonString)
+    return jsonString
+end
+
+--________________________________________________________--
+			----------------------------------
+					-- / Code \ --
+			----------------------------------
+
+-- / Auto Chop \ --
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local TreeRemote = ReplicatedStorage:WaitForChild("Signal"):WaitForChild("Tree")
+
+local chopping = false
+local treesToCut = 50
+
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    root = newChar:WaitForChild("HumanoidRootPart")
+end)
+
+local function getClosestTrees(limit)
+    local trees = {}
+    if not root then return trees end
+
+    for _, tree in pairs(workspace:GetDescendants()) do
+        if string.find(tree.Name, "World") and tree:IsA("Model") then
+            local mainPart = tree.PrimaryPart or tree:FindFirstChildWhichIsA("BasePart")
+            if mainPart then
+                local distance = (mainPart.Position - root.Position).Magnitude
+                table.insert(trees, {model = tree, dist = distance})
+            end
+        end
+    end
+
+    table.sort(trees, function(a, b) return a.dist < b.dist end)
+
+    local selected = {}
+    for i = 1, math.min(limit, #trees) do
+        table.insert(selected, trees[i].model)
+    end
+    return selected
+end
+
+local function startChopping()
+    if chopping then return end
+    chopping = true
+
+    task.spawn(function()
+        while chopping do
+            if not root or not character or not character.Parent then
+                task.wait(0.5)
+                continue
+            end
+
+            local nearbyTrees = getClosestTrees(treesToCut)
+            for _, tree in pairs(nearbyTrees) do
+                local args = {
+                    [1] = "damage",
+                    [2] = tree.Name
+                }
+                TreeRemote:FireServer(unpack(args))
+                task.wait(0.01)
+            end
+
+            task.wait(0.2)
+        end
+    end)
+end
+
+local function stopChopping()
+    chopping = false
+end
+
+-- / Auto Chest Collection --
+
+-- ======= Variables =======
+local teleporting = false
+local teleportThread = nil
+local selectedChestType = "Chest1"
+
+-- ======= Services =======
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- ======= Helper Functions =======
+local function findPrompt(chest)
+	for _, descendant in ipairs(chest:GetDescendants()) do
+		if descendant:IsA("ProximityPrompt") then
+			return descendant
+		end
+	end
+	return nil
+end
+
+-- Disable collisions only between player and trees
+local function disableTreeCollision(character)
+	local treeFolder = workspace:FindFirstChild("TreeFolder")
+	if not treeFolder then return end
+
+	for _, tree in ipairs(treeFolder:GetDescendants()) do
+		if tree:IsA("BasePart") then
+			for _, part in ipairs(character:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = true -- make sure collisions start enabled
+					-- disable collision only if they are touching tree parts
+					part:SetAttribute("IgnoreTree", true)
+					tree.CanTouch = false -- optional: prevents events firing
+				end
+			end
+		end
+	end
+end
+
+-- Turn collisions back to normal
+local function enableTreeCollision(character)
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") and part:GetAttribute("IgnoreTree") then
+			part.CanCollide = true
+			part:SetAttribute("IgnoreTree", nil)
+		end
+	end
+end
+
+-- ======= Main Teleport Logic =======
+local function startChestTeleport()
+	if teleporting then
+		return
+	end
+
+	teleporting = true
+
+	teleportThread = task.spawn(function()
+		local character = player.Character or player.CharacterAdded:Wait()
+		local hrp = character:WaitForChild("HumanoidRootPart")
+		local chestFolder = workspace:WaitForChild("ChestFolder")
+
+		disableTreeCollision(character)
+
+		while teleporting do
+			local variants = {
+				selectedChestType,
+				selectedChestType .. "_Huge",
+				selectedChestType .. "_Giant"
+			}
+
+			for _, chest in ipairs(chestFolder:GetChildren()) do
+				if not teleporting then break end
+
+				for _, variant in ipairs(variants) do
+					if chest.Name:lower() == variant:lower() then
+						local targetPart = chest:FindFirstChild("Hitpart") or chest:FindFirstChildWhichIsA("BasePart")
+						if targetPart then
+							hrp.CFrame = targetPart.CFrame + Vector3.new(0, 1.5, 0)
+							task.wait(0.15)
+
+							local prompt = findPrompt(chest)
+							if prompt then
+								local distance = (hrp.Position - prompt.Parent.Position).Magnitude
+								if distance <= prompt.MaxActivationDistance + 2 then
+									fireproximityprompt(prompt)
+
+									repeat
+										task.wait(0.1)
+									until not chest.Parent or not teleporting
+								end
+							end
+						end
+					end
+				end
+			end
+
+			task.wait(0.15)
+		end
+
+		enableTreeCollision(character)
+	end)
+end
+
+local function stopChestTeleport()
+	if not teleporting then
+		return
+	end
+
+	teleporting = false
+	local character = player.Character
+	if character then
+		enableTreeCollision(character)
+	end
+end
+
+-- / XRAY \ --
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local folder = player:WaitForChild("GamepassFolder")
+
+local XRAY = folder:FindFirstChild("XRAY")
+if not XRAY then
+    XRAY = Instance.new("BoolValue")
+    XRAY.Name = "XRAY"
+    XRAY.Parent = folder
+end
+
+RunService.RenderStepped:Connect(function()
+    if _G.XRAYToggle ~= nil then
+        XRAY.Value = _G.XRAYToggle
+    end
+end)
+
+--________________________________________________________--
+			----------------------------------
+					-- / Elements \ --
+			----------------------------------
+
+local Home = Window:Tab({ Title = "Home", Icon = "house", })
+local Auto = Window:Tab({ Title = "Auto", Icon = "axe" })
+local Tool = Window:Tab({ Title = "Tool", Icon = "pen-tool" })
+local Player = Window:Tab({ Title = "Player", Icon = "person-standing" })
+local Misc = Window:Tab({ Title = "Misc", Icon = "file-question" })
+local Settings = Window:Tab({ Title = "Settings", Icon = "settings" })
+
+-- */  Home Tab  \* --
+Home:Section({ Title = "Join our Discord server!", TextSize = 18, })
+
+
+local HomeParagraph = Home:Paragraph({
+	Title = "CELESTE HUB",
+	Desc = "One of the best Script Hubs out there make sure to join.",
+	Image = "rbxassetid://84656996854357",
+	ImageSize = 50,
+	Radius = 5,
+	Thumbnail = "rbxassetid://76105929126759",
+    ThumbnailSize = 200,
+    Radius = 5,
+	Buttons = {
+        {
+        	Title = "Copy link",
+        	Icon = "link",
+        	Callback = function()
+            	setclipboard("https://discord.gg/9HEHrMPVCD")
+        	end
+        }
+    }
+})
+
+-----------------------------------------------------------
+-- // AUTO CHOP \ --
+local AutoChop = Auto:Section({ Title = "Chop Trees" })
+
+local autoChopEnabled = false
+local treesToCut = 10
+
+Auto:Toggle({
+    Title = "Auto Chop Trees",
+    Default = false,
+    Callback = function(Value)
+        autoChopEnabled = Value
+        if Value then
+            startChopping()
+        else
+            stopChopping()
+        end
+    end
+})
+
+Auto:Input({
+    Title = "Tree Amount",
+    Placeholder = "Enter number of trees (1-9999)",
+    Default = tostring(treesToCut),
+    Numeric = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then
+            treesToCut = math.clamp(num, 1, 9999)
+        end
+    end
+})
+
+-----------------------------------------------------------
+-- // AUTO CHEST \ --
+local ChestSection = Auto:Section({ Title = "Chest Collection" })
+
+local selectedChestType = "Chest1"
+
+Auto:Dropdown({
+    Title = "Select Chest Type",
+    Values = {
+        "Chest1","Chest2","Chest3","Chest4","Chest5","Chest6","Chest7",
+        "Chest8","Chest9","Chest10","Chest11","Chest12","Chest13","Chest14"
+    },
+    Default = "Chest1",
+    Callback = function(Value)
+        selectedChestType = Value
+    end
+})
+
+Auto:Toggle({
+    Title = "Auto Teleport & Collect Chests",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startChestTeleport(selectedChestType)
+        else
+            stopChestTeleport()
+        end
+    end
+})
+
+-----------------------------------------------------------
+-- // NO CLIP TREES \ --
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local noclipEnabled = false
+local noclipConnection
+
+local PlayerSection = Player:Section({ Title = "Trees" })
+
+Player:Toggle({
+    Title = "No Clip Through Trees",
+    Default = false,
+    Callback = function(Value)
+        noclipEnabled = Value
+        if Value then
+            noclipConnection = RunService.Stepped:Connect(function()
+                if LocalPlayer.Character then
+                    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        else
+            if noclipConnection then
+                noclipConnection:Disconnect()
+                noclipConnection = nil
+            end
+
+            if LocalPlayer.Character then
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+})
+
+-----------------------------------------------------------
+-- // TOOL SIZE \ --
+local ToolSize = Tool:Section({ Title = "Tool Size" })
+
+local player = Players.LocalPlayer
+local originalInfo = {}
+
+getgenv().ToolToggleEnabled = false
+getgenv().ToolSizeMultiplier = 2
+
+Tool:Toggle({
+    Title = "Enable Tool Resize",
+    Default = false,
+    Callback = function(Value)
+        getgenv().ToolToggleEnabled = Value
+    end
+})
+
+Tool:Slider({
+    Title = "Tool Size Multiplier",
+    Value = {
+        Min = 2,
+        Max = 250,
+        Default = 2,
+    },
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().ToolSizeMultiplier = Value
+    end
+})
+
+task.spawn(function()
+    while task.wait(0.3) do
+        local character = player.Character
+        if not character then
+            task.wait(0.1)
+            continue
+        end
+
+        local tool = character:FindFirstChildWhichIsA("Tool")
+        if not tool then
+            task.wait(0.1)
+            continue
+        end
+
+        local handle = tool:FindFirstChild("Handle")
+        if not handle then
+            task.wait(0.1)
+            continue
+        end
+
+        if not originalInfo[tool] then
+            originalInfo[tool] = {Size = handle.Size, CanCollide = handle.CanCollide}
+        end
+
+        if getgenv().ToolToggleEnabled then
+            handle.Size = originalInfo[tool].Size * getgenv().ToolSizeMultiplier
+            handle.CanCollide = false
+        else
+            handle.Size = originalInfo[tool].Size
+            handle.CanCollide = originalInfo[tool].CanCollide
+        end
+    end
+end)
+
+-----------------------------------------------------------
+-- // WALKSPEED \ --
+local WalkspeedSection = Player:Section({ Title = "Walkspeed & Jump Power" })
+
+local WalkSpeedEnabled = false
+local humanoid = nil
+getgenv().CustomWalkSpeed = 16
+
+Player:Toggle({
+    Title = "WalkSpeed",
+    Default = false,
+    Callback = function(Value)
+        WalkSpeedEnabled = Value
+        local char = player.Character or player.CharacterAdded:Wait()
+        humanoid = char:WaitForChild("Humanoid")
+
+        if Value then
+            humanoid.WalkSpeed = getgenv().CustomWalkSpeed
+        else
+            humanoid.WalkSpeed = 16
+        end
+    end
+})
+
+Player:Input({
+    Title = "Speed Input",
+    Placeholder = "16-1000",
+    Default = "16",
+    Numeric = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then
+            if num < 16 or num > 1000 then
+                WindUI:Notify({
+                    Title = "Invalid WalkSpeed",
+                    Content = "WalkSpeed must be between 16 and 1000!",
+                    Duration = 5
+                })
+                num = 16
+            end
+            getgenv().CustomWalkSpeed = num
+
+            if WalkSpeedEnabled and humanoid then
+                humanoid.WalkSpeed = num
+            end
+        end
+    end
+})
+
+-----------------------------------------------------------
+-- // CHEST XRAY \ --
+local XRAYSection = Misc:Section({ Title = "Chest XRAY" })
+
+Misc:Toggle({
+    Title = "Chest XRAY",
+    Default = false,
+    Callback = function(Value)
+        _G.XRAYToggle = Value
+    end
+})
